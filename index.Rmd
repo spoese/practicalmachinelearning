@@ -9,106 +9,120 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+##Executive Summary
+
+The goal of the assignment was to use a training set of 19622 observations of
+158 measurements of six people doing an exercise either correctly or incorrectly
+and be able to identify which category (correct/incorrect and what they were
+doing incorrectly) each of 20 different observations in the test set should be
+placed. In the end, 11 different features were used to create a random forest
+model that had an in-sample error rate of just over 2% (458/19622) and an 
+out-of-sample error rate of 5% (1/20).
+
 ```{r requires}
 require(dplyr)
 require(caret)
+require(ggplot2)
 ```
+
+##Data Import and Wrangling
+We begin by importing the data into R.
 
 ```{r import}
-fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
-download.file(fileURL,destfile = "pml-training.csv")
+
+if (!file.exists("pml-training.csv")) {
+        fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+        download.file(fileURL,destfile = "pml-training.csv")
+}
+
 training <- read.csv("pml-training.csv")
-trainFilter <- training
-```
 
-```{r features}
-trainFilter$max_accel_belt <- with(trainFilter,ave(total_accel_belt,num_window,
-                                          FUN=max))
-trainFilter$range_accel_belt <- 
-        with(trainFilter,ave(total_accel_belt,num_window,
-                             FUN = function(x){range(x)[2]-range(x)[1]}))
-trainFilter$total_gyro_belt <-
-        with(trainFilter,sqrt(gyros_belt_x^2+gyros_belt_y^2+gyros_belt_z^2))
-trainFilter$var_gyro_belt <- 
-        with(trainFilter,ave(total_gyro_belt,num_window,FUN=var))
-trainFilter$total_magnet_belt <- 
-        with(trainFilter,sqrt(magnet_belt_x^2+magnet_belt_y^2+magnet_belt_z^2))
-trainFilter$var_magnet_belt <- 
-        with(trainFilter,ave(total_magnet_belt,num_window,FUN=var))
-trainFilter$total_magnet_arm <-
-        with(trainFilter,sqrt(magnet_arm_x^2+magnet_arm_y^2+magnet_arm_z^2))
-trainFilter$max_magnet_arm <- 
-        with(trainFilter,ave(total_magnet_arm,num_window,FUN=max))    
-trainFilter$min_magnet_arm <- 
-        with(trainFilter,ave(total_magnet_arm,num_window,FUN=min))
-trainFilter$max_accel_dumbbell <-
-        with(trainFilter,ave(total_accel_dumbbell,num_window,FUN=max))
-trainFilter$total_gyro_dumbbell <- 
-        with(trainFilter,sqrt(gyros_dumbbell_x^2+gyros_dumbbell_y^2+gyros_dumbbell_z^2))
-trainFilter$var_gyro_dumbbell <-
-        with(trainFilter,ave(total_gyro_dumbbell,num_window,FUN=var))
-trainFilter$total_magnet_dumbbell <-
-        with(trainFilter,sqrt(magnet_dumbbell_x^2+magnet_dumbbell_y^2+magnet_dumbbell_z^2))
-trainFilter$max_magnet_dumbbell <-
-        with(trainFilter,ave(total_magnet_dumbbell,num_window,FUN=max))
-trainFilter$min_magnet_dumbbell <-
-        with(trainFilter,ave(total_magnet_dumbbell,num_window,FUN=min))
-trainFilter$sum_pitch_forearm <- 
-        with(trainFilter,ave(pitch_forearm,num_window,FUN=sum))
-trainFilter$total_gyro_forearm <- 
-        with(trainFilter,sqrt(gyros_forearm_x^2+gyros_forearm_y^2+gyros_forearm_z^2))
-trainFilter$max_gyro_forearm <- 
-        with(trainFilter,ave(total_gyro_forearm,num_window,FUN=max))
-trainFilter$min_gyro_forearm <- 
-        with(trainFilter,ave(total_gyro_forearm,num_window,FUN=min))
-trainFilter <- trainFilter[,c(160,161,162,164,166,168:170,172,174:176,178,179)]
-```
-
-```{r testing}
-fileURL2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
-download.file(fileURL2,destfile="pml-testing.csv")
+if (!file.exists("pml-training.csv")) {
+        fileURL2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+        download.file(fileURL2,destfile="pml-testing.csv")
+}
 testing <- read.csv("pml-testing.csv")
 ```
 
-```{r testingRED}
-testing$max_accel_belt <- with(testing,ave(total_accel_belt,num_window,
-                                          FUN=max))
-testing$range_accel_belt <- 
-        with(testing,ave(total_accel_belt,num_window,
-                             FUN = function(x){range(x)[2]-range(x)[1]}))
-testing$total_gyro_belt <-
-        with(testing,sqrt(gyros_belt_x^2+gyros_belt_y^2+gyros_belt_z^2))
-testing$var_gyro_belt <- 
-        with(testing,ave(total_gyro_belt,num_window,FUN=var))
-testing$total_magnet_belt <- 
-        with(testing,sqrt(magnet_belt_x^2+magnet_belt_y^2+magnet_belt_z^2))
-testing$var_magnet_belt <- 
-        with(testing,ave(total_magnet_belt,num_window,FUN=var))
-testing$total_magnet_arm <-
-        with(testing,sqrt(magnet_arm_x^2+magnet_arm_y^2+magnet_arm_z^2))
-testing$max_magnet_arm <- 
-        with(testing,ave(total_magnet_arm,num_window,FUN=max))    
-testing$min_magnet_arm <- 
-        with(testing,ave(total_magnet_arm,num_window,FUN=min))
-testing$max_accel_dumbbell <-
-        with(testing,ave(total_accel_dumbbell,num_window,FUN=max))
-testing$total_gyro_dumbbell <- 
-        with(testing,sqrt(gyros_dumbbell_x^2+gyros_dumbbell_y^2+gyros_dumbbell_z^2))
-testing$var_gyro_dumbbell <-
-        with(testing,ave(total_gyro_dumbbell,num_window,FUN=var))
-testing$total_magnet_dumbbell <-
-        with(testing,sqrt(magnet_dumbbell_x^2+magnet_dumbbell_y^2+magnet_dumbbell_z^2))
-testing$max_magnet_dumbbell <-
-        with(testing,ave(total_magnet_dumbbell,num_window,FUN=max))
-testing$min_magnet_dumbbell <-
-        with(testing,ave(total_magnet_dumbbell,num_window,FUN=min))
-testing$sum_pitch_forearm <- 
-        with(testing,ave(pitch_forearm,num_window,FUN=sum))
-testing$total_gyro_forearm <- 
-        with(testing,sqrt(gyros_forearm_x^2+gyros_forearm_y^2+gyros_forearm_z^2))
-testing$max_gyro_forearm <- 
-        with(testing,ave(total_gyro_forearm,num_window,FUN=max))
-testing$min_gyro_forearm <- 
-        with(testing,ave(total_gyro_forearm,num_window,FUN=min))
-testing <- testing[,c(160,161,162,164,166,168:170,172,174:176,178,179)]
+Now, we check to see which of the variables are actually usable by checking
+which columns have NA values and excluding those.
+
+```{r features}
+index <- 0
+for (i in 1:160) {
+        if (sum(is.na(testing[,i]))==0) {
+                index <- c(index,i)
+        }
+}
+index <- index[-1]
+newTest <- testing[,index]
+newTrain <- training[,index]
+
+for (i in 1:60) {
+        if(sum(is.na(newTrain[,i]))!=0) {
+                print(i) #Check for completeness in the training set
+        }
+}
+dim(newTest); dim(newTrain)
+```
+
+We can see that there are 60 columns left to work with, and that none of the
+remaining values have any NA values.
+
+In the original paper written on exploring the dataset, the authors mention that
+they used 17 different features, some of which are not explicitly measured. So
+let's try using the features that **do** exist in the dataset. Namely,
+roll_belt, total_accel_belt, total_accel_arm, total_accel_dumbbell, and
+pitch_forearm.
+
+```{r filter}
+trainFit <- newTrain[,c(8,11,24,37,48,60)]
+testFit <- newTest[,c(8,11,24,37,48,60)]
+```
+
+##Exploratory Data Analysis
+
+Let's look at some of the variables the authors used and see how well they break
+up the activities. We look at violin plots to see if they might be able to
+accurately pick out a single class of activity.
+
+```{r violins}
+ggplot(newTrain,aes(x=classe,y=roll_belt)) + geom_violin(fill="green")
+ggplot(newTrain,aes(x=classe,y=total_accel_belt)) + geom_violin(fill="red")
+ggplot(newTrain,aes(x=classe,y=total_accel_arm)) + geom_violin(fill="blue")
+ggplot(newTrain,aes(x=classe,y=total_accel_dumbbell)) + geom_violin(fill="black")
+ggplot(newTrain,aes(x=classe,y=pitch_forearm)) + geom_violin(fill="grey")
+```
+
+It seems that while some of the classes look similar in a single variable, the
+combination of them should be able to do a decent job of picking them out. 
+
+##Model Fitting
+
+So let's fit our model to a random forest with repeated 3-fold cross validation.
+
+```{r model, cache = TRUE}
+modFit <- train(classe ~ ., data = trainFit, method = "rf", 
+                trControl = trainControl(method="repeatedcv",number=3,repeats=3))
+```
+
+We can look at the confusion matrix for the model to see it's in-sample accuracy
+rate and the model as a whole to see our estimate for our out-of-sample error
+rate.
+
+```{r confusion, cache = TRUE}
+modFit$finalModel
+```
+
+With an error rate of about 11.35%, we would expect our out-of-sample rate to be
+slightly higher, perhaps 15-20%.
+
+##Results
+
+When using this model, it appears we got a little lucky as the model correctly
+predicted every test observation. A different sample would have likely yielded
+worse results.
+
+```{r prediction}
+predict(modFit,testFit)
 ```
