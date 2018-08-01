@@ -9,22 +9,106 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r requires}
+require(dplyr)
+require(caret)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r import}
+fileURL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(fileURL,destfile = "pml-training.csv")
+training <- read.csv("pml-training.csv")
+trainFilter <- training
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r features}
+trainFilter$max_accel_belt <- with(trainFilter,ave(total_accel_belt,num_window,
+                                          FUN=max))
+trainFilter$range_accel_belt <- 
+        with(trainFilter,ave(total_accel_belt,num_window,
+                             FUN = function(x){range(x)[2]-range(x)[1]}))
+trainFilter$total_gyro_belt <-
+        with(trainFilter,sqrt(gyros_belt_x^2+gyros_belt_y^2+gyros_belt_z^2))
+trainFilter$var_gyro_belt <- 
+        with(trainFilter,ave(total_gyro_belt,num_window,FUN=var))
+trainFilter$total_magnet_belt <- 
+        with(trainFilter,sqrt(magnet_belt_x^2+magnet_belt_y^2+magnet_belt_z^2))
+trainFilter$var_magnet_belt <- 
+        with(trainFilter,ave(total_magnet_belt,num_window,FUN=var))
+trainFilter$total_magnet_arm <-
+        with(trainFilter,sqrt(magnet_arm_x^2+magnet_arm_y^2+magnet_arm_z^2))
+trainFilter$max_magnet_arm <- 
+        with(trainFilter,ave(total_magnet_arm,num_window,FUN=max))    
+trainFilter$min_magnet_arm <- 
+        with(trainFilter,ave(total_magnet_arm,num_window,FUN=min))
+trainFilter$max_accel_dumbbell <-
+        with(trainFilter,ave(total_accel_dumbbell,num_window,FUN=max))
+trainFilter$total_gyro_dumbbell <- 
+        with(trainFilter,sqrt(gyros_dumbbell_x^2+gyros_dumbbell_y^2+gyros_dumbbell_z^2))
+trainFilter$var_gyro_dumbbell <-
+        with(trainFilter,ave(total_gyro_dumbbell,num_window,FUN=var))
+trainFilter$total_magnet_dumbbell <-
+        with(trainFilter,sqrt(magnet_dumbbell_x^2+magnet_dumbbell_y^2+magnet_dumbbell_z^2))
+trainFilter$max_magnet_dumbbell <-
+        with(trainFilter,ave(total_magnet_dumbbell,num_window,FUN=max))
+trainFilter$min_magnet_dumbbell <-
+        with(trainFilter,ave(total_magnet_dumbbell,num_window,FUN=min))
+trainFilter$sum_pitch_forearm <- 
+        with(trainFilter,ave(pitch_forearm,num_window,FUN=sum))
+trainFilter$total_gyro_forearm <- 
+        with(trainFilter,sqrt(gyros_forearm_x^2+gyros_forearm_y^2+gyros_forearm_z^2))
+trainFilter$max_gyro_forearm <- 
+        with(trainFilter,ave(total_gyro_forearm,num_window,FUN=max))
+trainFilter$min_gyro_forearm <- 
+        with(trainFilter,ave(total_gyro_forearm,num_window,FUN=min))
+trainFilter <- trainFilter[,c(160,161,162,164,166,168:170,172,174:176,178,179)]
+```
+
+```{r testing}
+fileURL2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(fileURL2,destfile="pml-testing.csv")
+testing <- read.csv("pml-testing.csv")
+```
+
+```{r testingRED}
+testing$max_accel_belt <- with(testing,ave(total_accel_belt,num_window,
+                                          FUN=max))
+testing$range_accel_belt <- 
+        with(testing,ave(total_accel_belt,num_window,
+                             FUN = function(x){range(x)[2]-range(x)[1]}))
+testing$total_gyro_belt <-
+        with(testing,sqrt(gyros_belt_x^2+gyros_belt_y^2+gyros_belt_z^2))
+testing$var_gyro_belt <- 
+        with(testing,ave(total_gyro_belt,num_window,FUN=var))
+testing$total_magnet_belt <- 
+        with(testing,sqrt(magnet_belt_x^2+magnet_belt_y^2+magnet_belt_z^2))
+testing$var_magnet_belt <- 
+        with(testing,ave(total_magnet_belt,num_window,FUN=var))
+testing$total_magnet_arm <-
+        with(testing,sqrt(magnet_arm_x^2+magnet_arm_y^2+magnet_arm_z^2))
+testing$max_magnet_arm <- 
+        with(testing,ave(total_magnet_arm,num_window,FUN=max))    
+testing$min_magnet_arm <- 
+        with(testing,ave(total_magnet_arm,num_window,FUN=min))
+testing$max_accel_dumbbell <-
+        with(testing,ave(total_accel_dumbbell,num_window,FUN=max))
+testing$total_gyro_dumbbell <- 
+        with(testing,sqrt(gyros_dumbbell_x^2+gyros_dumbbell_y^2+gyros_dumbbell_z^2))
+testing$var_gyro_dumbbell <-
+        with(testing,ave(total_gyro_dumbbell,num_window,FUN=var))
+testing$total_magnet_dumbbell <-
+        with(testing,sqrt(magnet_dumbbell_x^2+magnet_dumbbell_y^2+magnet_dumbbell_z^2))
+testing$max_magnet_dumbbell <-
+        with(testing,ave(total_magnet_dumbbell,num_window,FUN=max))
+testing$min_magnet_dumbbell <-
+        with(testing,ave(total_magnet_dumbbell,num_window,FUN=min))
+testing$sum_pitch_forearm <- 
+        with(testing,ave(pitch_forearm,num_window,FUN=sum))
+testing$total_gyro_forearm <- 
+        with(testing,sqrt(gyros_forearm_x^2+gyros_forearm_y^2+gyros_forearm_z^2))
+testing$max_gyro_forearm <- 
+        with(testing,ave(total_gyro_forearm,num_window,FUN=max))
+testing$min_gyro_forearm <- 
+        with(testing,ave(total_gyro_forearm,num_window,FUN=min))
+testing <- testing[,c(160,161,162,164,166,168:170,172,174:176,178,179)]
+```
